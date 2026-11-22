@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel trading XTB</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: sobrio, de terminal de trading, cifras primero
+   IDEA: el calendario de PnL de una plataforma de trading
+   PICTURE: grilla mensual lun–vie con días verdes/rojos y total semanal
+   COLOUR and TYPE: negro, verde #3fb950, rojo #f0605d; Inter
+   LAYOUT: KPIs, calendario, formulario del día, respaldo */
+:root{color-scheme:dark;--bg:#000;--card:#0d0d0e;--card2:#141416;--line:#26262a;--ink:#f2f2f2;--mut:#8b8b92;--up:#3fb950;--upbg:#0f2414;--dn:#f0605d;--dnbg:#2a1212}
+:root[data-theme=light]{color-scheme:light;--bg:#f6f6f4;--card:#fff;--card2:#f1f0ec;--line:#dedcd6;--ink:#111;--mut:#6b6b70;--up:#1a7f37;--upbg:#e3f4e6;--dn:#c62f2c;--dnbg:#fbe6e5}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif;overflow-x:clip;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1000px;margin:0 auto;padding:clamp(16px,3vw,32px) max(4vw,12px) 48px}
+h1{font-size:clamp(22px,4vw,30px);font-weight:600;margin:0 0 4px;line-height:1.1}
+.sub{color:var(--mut);font-size:13px;margin:0 0 18px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px}
+.k{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.k span{display:block;color:var(--mut);font-size:13px}
+.k b{display:block;font-size:clamp(19px,3.4vw,26px);font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px;white-space:nowrap}
+.up{color:var(--up)}.dn{color:var(--dn)}
+.nav{display:flex;align-items:center;justify-content:space-between;margin:4px 0 10px;gap:8px}
+.nav h2{font-size:17px;font-weight:600;margin:0;text-transform:capitalize}
+button,.btn{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:10px;min-height:44px;padding:0 14px;font:inherit;font-weight:500;cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--up);outline-offset:2px}
+.nav button{width:44px;padding:0;font-size:18px}
+.grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr)) minmax(0,1.1fr);gap:8px}
+.hd{background:var(--card);border:1px solid var(--line);border-radius:10px;text-align:center;padding:8px 0;font-weight:500;font-size:13px}
+.day{min-height:96px;padding:8px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;border-radius:12px;gap:1px}
+.day .n{position:absolute;top:6px;right:9px;font-size:13px;color:var(--mut)}
+.day.out{opacity:.35}
+.day.pos{background:var(--upbg);border-color:color-mix(in srgb,var(--up) 40%,transparent)}
+.day.neg{background:var(--dnbg);border-color:color-mix(in srgb,var(--dn) 40%,transparent)}
+.day.sel{outline:2px solid var(--ink);outline-offset:1px}
+.day .v{font-weight:600;font-size:15px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.day .s{font-size:12px;color:var(--mut);white-space:nowrap}
+.wk{border:1px dashed var(--line);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:96px}
+.card{margin-top:16px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+.card h3{margin:0 0 12px;font-size:16px;font-weight:600}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--mut)}
+input,textarea{background:var(--card2);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;font-size:16px;min-height:44px;width:100%}
+textarea{min-height:70px;resize:vertical}
+.full{grid-column:1/-1}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.pri{background:var(--up);color:#04140a;border-color:var(--up)}
+.del{color:var(--dn)}
+.msg{font-size:13px;margin-top:8px;min-height:1.2em}
+.err{color:var(--dn)}
+.ok{color:var(--up)}
+details summary{cursor:pointer;font-weight:600;min-height:44px;display:flex;align-items:center}
+.foot{color:var(--mut);font-size:12px;margin-top:22px}
+@media(max-width:600px){
+ .grid{gap:5px;grid-template-columns:repeat(5,minmax(0,1fr))}
+ .wcol{display:none!important}
+ .day{min-height:72px;padding:6px 2px;border-radius:10px}
+ .day .n{top:4px;right:6px;font-size:11px}
+ .day .v{font-size:12px}.day .s{font-size:10.5px}
+ .hd{font-size:12px;padding:6px 0}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Panel de trading XTB</h1>
+<p class="sub" id="sub">Toca un día para agregar o editar su resultado.</p>
+<div class="kpis" id="kpis"></div>
+<div class="nav">
+ <button id="prev" aria-label="Mes anterior">‹</button>
+ <h2 id="mes"></h2>
+ <button id="next" aria-label="Mes siguiente">›</button>
+</div>
+<div class="grid" id="cal"></div>
+
+<div class="card" id="editor">
+ <h3 id="edTitle">Agregar día</h3>
+ <form id="f" class="form" novalidate>
+  <label>Fecha<input type="date" id="fFecha" required></label>
+  <label>Resultado (CLP)<input type="number" id="fPl" step="1" inputmode="numeric" placeholder="-25000 o 48000" required></label>
+  <label>Trades<input type="number" id="fTr" min="0" step="1" inputmode="numeric"></label>
+  <label>Ganadoras<input type="number" id="fGa" min="0" step="1" inputmode="numeric"></label>
+  <label class="full">Nota<textarea id="fNota" placeholder="Qué hiciste bien, qué regla rompiste, noticias…"></textarea></label>
+ </form>
+ <div class="acts">
+  <button class="pri" id="guardar">Guardar día</button>
+  <button id="nuevo">Nuevo</button>
+  <button class="del" id="borrar" hidden>Borrar día</button>
+ </div>
+ <div class="msg" id="msg" role="status"></div>
+</div>
+
+<div class="card">
+ <details>
+  <summary>Ajustes y respaldo</summary>
+  <div class="form" style="margin-top:8px">
+   <label>Valor de 1R (CLP)<input type="number" id="sR" min="1" step="1" inputmode="numeric"></label>
+   <label>Capital para el % (CLP)<input type="number" id="sCap" min="1" step="1" inputmode="numeric"></label>
+  </div>
+  <div class="acts">
+   <button id="guardarAj">Guardar ajustes</button>
+   <button id="exportar">Descargar respaldo</button>
+   <button id="copiar">Copiar respaldo</button>
+   <label class="btn" style="flex-direction:row;align-items:center;color:var(--ink);font-size:15px">Importar archivo<input type="file" id="imp" accept=".json,application/json" hidden></label>
+  </div>
+  <label class="full" style="margin-top:12px">O pega un respaldo aquí<textarea id="pegar" placeholder='{"dias":{…}}'></textarea></label>
+  <div class="acts"><button id="cargarPegado">Cargar respaldo pegado</button></div>
+  <div class="msg" id="msg2" role="status"></div>
+ </details>
+</div>
+<p class="foot">Los datos se guardan en este navegador. Descarga un respaldo cada semana y cárgalo en otro equipo para tenerlos allá.</p>
+</div>
+<script>
+{
+const KEY='xtbPanel.v1';
+const SEED={ajustes:{R:10000,cap:1000000},dias:{}};
+let db;
+try{db=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!db||!db.dias)db=structuredClone(SEED);
+let puedeGuardar=true;
+const persistir=()=>{try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){puedeGuardar=false;document.getElementById('sub').textContent='Este navegador no permite guardar: usa Descargar respaldo para no perder datos.'}};
+persistir();
+
+const $=id=>document.getElementById(id);
+const fmt=v=>(v<0?'-':'+')+Math.abs(Math.round(v)).toLocaleString('es-CL');
+const pct=v=>(v<0?'-':'+')+Math.abs(v/db.ajustes.cap*100).toFixed(2).replace('.',',')+'%';
+const fR=v=>(v<0?'-':'+')+Math.abs(v/db.ajustes.R).toFixed(1).replace('.',',')+'R';
+const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const lunes=d=>{const x=new Date(d);x.setDate(x.getDate()-((x.getDay()+6)%7));return x};
+const hoy=new Date();
+const claves=Object.keys(db.dias).sort();
+let ver=claves.length?new Date(claves[claves.length-1]+'T12:00:00'):new Date(hoy);
+ver=new Date(ver.getFullYear(),ver.getMonth(),1);
+let sel=null;
+
+function kpis(){
+ const y=ver.getFullYear(),m=ver.getMonth();
+ const dd=Object.entries(db.dias).filter(([k])=>{const f=new Date(k+'T12:00:00');return f.getFullYear()===y&&f.getMonth()===m}).map(([,v])=>v);
+ const neto=dd.reduce((a,b)=>a+b.pl,0);
+ const tr=dd.reduce((a,b)=>a+(b.tr||0),0), ga=dd.reduce((a,b)=>a+(b.ga||0),0);
+ const g=dd.filter(d=>d.pl>0).reduce((a,b)=>a+b.pl,0), p=-dd.filter(d=>d.pl<0).reduce((a,b)=>a+b.pl,0);
+ const pf=p?g/p:null;
+ const mejor=dd.length?Math.max(...dd.map(d=>d.pl)):null, peor=dd.length?Math.min(...dd.map(d=>d.pl)):null;
+ $('kpis').innerHTML=[
+  ['Neto del mes',dd.length?fmt(neto):'—',neto<0?'dn':neto>0?'up':''],
+  ['Trades',tr||'—',''],
+  ['Días operados',dd.length,''],
+  ['Win rate',tr?Math.round(ga/tr*100)+'%':'—',''],
+  ['Profit factor (días)',pf===null?(g?'∞':'—'):pf.toFixed(2).replace('.',','),pf!==null&&pf<1?'dn':'up'],
+  ['Peor día',peor===null?'—':fmt(peor),peor<0?'dn':'up']
+ ].map(([l,v,c])=>`<div class="k"><span>${l}</span><b class="${c}">${v}</b></div>`).join('');
+}
+
+function pintar(){
+ const y=ver.getFullYear(),m=ver.getMonth();
+ $('mes').textContent=ver.toLocaleDateString('es-CL',{month:'long',year:'numeric'});
+ let h=['Lun','Mar','Mié','Jue','Vie'].map(d=>`<div class="hd">${d}</div>`).join('')+'<div class="hd wcol">Semana</div>';
+ let d=lunes(new Date(y,m,1));const fin=new Date(y,m+1,0);
+ while(d<=fin){
+  let suma=0,trs=0,hay=false;
+  for(let i=0;i<5;i++){
+   const k=iso(d),x=db.dias[k],out=d.getMonth()!==m;
+   if(x){suma+=x.pl;trs+=x.tr||0;hay=true}
+   const cls=['day',out?'out':'',x?(x.pl<0?'neg':'pos'):'',sel===k?'sel':''].join(' ');
+   const t=x&&x.tr!=null?`${x.tr} trade${x.tr===1?'':'s'}`:x?fR(x.pl):'';
+   h+=`<button class="${cls}" data-k="${k}" aria-label="${d.getDate()}${x?' '+fmt(x.pl):' sin datos'}"><span class="n">${d.getDate()}</span>${x?`<span class="v ${x.pl<0?'dn':'up'}">${pct(x.pl)}</span><span class="s">${fmt(x.pl)}</span><span class="s">${t}</span>`:''}</button>`;
+   d.setDate(d.getDate()+1);
+  }
+  d.setDate(d.getDate()+2);
+  h+=`<div class="wk wcol">${hay?`<span class="v ${suma<0?'dn':'up'}" style="font-weight:600">${fmt(suma)}</span><span class="s" style="color:var(--mut);font-size:12px">${fR(suma)}${trs?' · '+trs+' tr':''}</span>`:''}</div>`;
+ }
+ $('cal').innerHTML=h;
+ kpis();
+}
+
+function cargarForm(k){
+ sel=k;const x=db.dias[k];
+ $('fFecha').value=k;
+ $('fPl').value=x?x.pl:'';$('fTr').value=x&&x.tr!=null?x.tr:'';$('fGa').value=x&&x.ga!=null?x.ga:'';$('fNota').value=x?x.nota||'':'';
+ $('edTitle').textContent=x?'Editar día':'Agregar día';
+ $('borrar').hidden=!x;$('msg').textContent='';
+ pintar();
+}
+$('cal').addEventListener('click',e=>{
+ const b=e.target.closest('.day');if(!b)return;
+ cargarForm(b.dataset.k);
+ $('editor').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});
+ $('fPl').focus({preventScroll:true});
+});
+const aviso=(el,t,ok)=>{el.textContent=t;el.className='msg '+(ok?'ok':'err')};
+['fFecha','fPl','fTr','fGa'].forEach(id=>$(id).addEventListener('input',()=>{$('msg').textContent=''}));
+
+$('guardar').onclick=()=>{
+ const k=$('fFecha').value,pl=$('fPl').value.trim(),tr=$('fTr').value.trim(),ga=$('fGa').value.trim();
+ if(!k)return aviso($('msg'),'Elige una fecha.');
+ if(pl===''||isNaN(+pl))return aviso($('msg'),'Escribe el resultado en CLP (negativo si perdiste).');
+ if(tr!==''&&(+tr<0||!Number.isInteger(+tr)))return aviso($('msg'),'Trades debe ser un número entero.');
+ if(ga!==''&&(+ga<0||!Number.isInteger(+ga)))return aviso($('msg'),'Ganadoras debe ser un número entero.');
+ if(ga!==''&&tr!==''&&+ga>+tr)return aviso($('msg'),'Las ganadoras no pueden ser más que los trades.');
+ if(sel&&sel!==k)delete db.dias[sel];
+ db.dias[k]={pl:Math.round(+pl),tr:tr===''?null:+tr,ga:ga===''?null:+ga,nota:$('fNota').value.trim()};
+ persistir();
+ const f=new Date(k+'T12:00:00');ver=new Date(f.getFullYear(),f.getMonth(),1);
+ cargarForm(k);aviso($('msg'),'Día guardado.',true);
+};
+$('nuevo').onclick=()=>{sel=null;$('f').reset();$('fFecha').value=iso(hoy);$('edTitle').textContent='Agregar día';$('borrar').hidden=true;$('msg').textContent='';pintar()};
+let confirmar=false;
+$('borrar').onclick=()=>{
+ if(!confirmar){confirmar=true;$('borrar').textContent='Toca de nuevo para borrar';setTimeout(()=>{confirmar=false;$('borrar').textContent='Borrar día'},3000);return}
+ confirmar=false;$('borrar').textContent='Borrar día';
+ delete db.dias[sel];persistir();$('nuevo').onclick();aviso($('msg'),'Día borrado.',true);
+};
+$('prev').onclick=()=>{ver=new Date(ver.getFullYear(),ver.getMonth()-1,1);pintar()};
+$('next').onclick=()=>{ver=new Date(ver.getFullYear(),ver.getMonth()+1,1);pintar()};
+
+$('sR').value=db.ajustes.R;$('sCap').value=db.ajustes.cap;
+$('guardarAj').onclick=()=>{
+ const r=+$('sR').value,c=+$('sCap').value;
+ if(!(r>0)||!(c>0))return aviso($('msg2'),'R y capital deben ser mayores que 0.');
+ db.ajustes={R:Math.round(r),cap:Math.round(c)};persistir();pintar();aviso($('msg2'),'Ajustes guardados.',true);
+};
+const json=()=>JSON.stringify(db,null,1);
+$('exportar').onclick=()=>{
+ try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([json()],{type:'application/json'}));a.download='respaldo-trading-'+iso(hoy)+'.json';document.body.appendChild(a);a.click();a.remove();aviso($('msg2'),'Respaldo descargado.',true)}
+ catch(e){aviso($('msg2'),'No se pudo descargar aquí: usa Copiar respaldo.')}
+};
+$('copiar').onclick=async()=>{
+ try{await navigator.clipboard.writeText(json());aviso($('msg2'),'Respaldo copiado. Pégalo en una nota o archivo.',true)}
+ catch(e){$('pegar').value=json();aviso($('msg2'),'No se pudo copiar: el respaldo quedó en el cuadro de abajo.')}
+};
+function importar(txt){
+ try{const d=JSON.parse(txt);if(!d||typeof d.dias!=='object')throw 0;
+  for(const [k,v] of Object.entries(d.dias)){if(!/^\d{4}-\d{2}-\d{2}$/.test(k)||typeof v.pl!=='number')throw 0}
+  db={ajustes:d.ajustes&&d.ajustes.R>0&&d.ajustes.cap>0?d.ajustes:db.ajustes,dias:d.dias};
+  persistir();$('sR').value=db.ajustes.R;$('sCap').value=db.ajustes.cap;pintar();aviso($('msg2'),'Respaldo cargado: '+Object.keys(db.dias).length+' días.',true);
+ }catch(e){aviso($('msg2'),'Ese respaldo no es válido.')}
+}
+$('imp').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(importar);e.target.value=''};
+$('cargarPegado').onclick=()=>{const t=$('pegar').value.trim();if(!t)return aviso($('msg2'),'Pega un respaldo primero.');importar(t)};
+$('pegar').addEventListener('input',()=>{$('msg2').textContent=''});
+
+$('fFecha').value=iso(hoy);
+pintar();
+}
+</script>
+</body>
+</html>
